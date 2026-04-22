@@ -4,6 +4,7 @@ input=$(cat)
 eval "$(echo "$input" | jq -r '
   @sh "model=\(.model.display_name // "unknown")",
   @sh "used_pct=\(.context_window.used_percentage // 0)",
+  @sh "cache_read=\(.context_window.cache_read_input_tokens // 0)",
   @sh "total_in=\(.context_window.total_input_tokens // 0)",
   @sh "total_out=\(.context_window.total_output_tokens // 0)",
   @sh "cost_usd=\(.cost.total_cost_usd // "")",
@@ -172,7 +173,15 @@ fi
 out+="${ORANGE}${model_lower}${RST}"
 
 out+="  ${ORANGE}${ctx_filled_dots}${RST}${GRAY}${ctx_empty_dots}${RST}"
-out+=" ${ORANGE}${used_int}%${RST}"
+cache_pct=0
+if [ "$total_in" -gt 0 ]; then
+  cache_pct=$(( cache_read * 100 / total_in ))
+fi
+if [ "$cache_pct" -ge 70 ]; then cache_color="$BGREEN"
+elif [ "$cache_pct" -ge 40 ]; then cache_color="$BYELLOW"
+else cache_color="$BRED"
+fi
+out+=" ${ORANGE}${used_int}%${RST} ${cache_color}(${cache_pct}%c)${RST}"
 
 out+="  ${cost_field}"
 
