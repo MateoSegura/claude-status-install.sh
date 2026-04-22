@@ -1,24 +1,4 @@
 #!/usr/bin/env bash
-set -euo pipefail
-
-SCRIPT_DIR="$HOME/.claude/scripts"
-SCRIPT_PATH="$SCRIPT_DIR/statusline-command.sh"
-SETTINGS_PATH="$HOME/.claude/settings.json"
-
-echo "Installing Claude Code status line..."
-
-# --- Check for jq ---
-if ! command -v jq &>/dev/null; then
-  echo "Error: jq is required but not installed."
-  echo "  brew install jq  (macOS)"
-  echo "  apt install jq   (Debian/Ubuntu)"
-  exit 1
-fi
-
-# --- Write the status line script ---
-mkdir -p "$SCRIPT_DIR"
-cat > "$SCRIPT_PATH" << 'STATUSLINE'
-#!/usr/bin/env bash
 input=$(cat)
 
 eval "$(echo "$input" | jq -r '
@@ -27,6 +7,8 @@ eval "$(echo "$input" | jq -r '
   @sh "total_in=\(.context_window.total_input_tokens // 0)",
   @sh "total_out=\(.context_window.total_output_tokens // 0)",
   @sh "cost_usd=\(.cost.total_cost_usd // "")",
+  @sh "lines_add=\(.cost.total_lines_added // 0)",
+  @sh "lines_rm=\(.cost.total_lines_removed // 0)",
   @sh "duration_ms=\(.cost.total_duration_ms // 0)",
   @sh "rate_5h=\(.rate_limits.five_hour.used_percentage // "")",
   @sh "rate_7d=\(.rate_limits.seven_day.used_percentage // "")",
@@ -208,26 +190,3 @@ if [ -n "$agent_name" ]; then
 fi
 
 printf '%b\n' "$out"
-STATUSLINE
-chmod +x "$SCRIPT_PATH"
-
-# --- Patch settings.json ---
-if [ ! -f "$SETTINGS_PATH" ]; then
-  mkdir -p "$(dirname "$SETTINGS_PATH")"
-  echo '{}' > "$SETTINGS_PATH"
-fi
-
-if jq -e '.statusLine' "$SETTINGS_PATH" &>/dev/null; then
-  echo "statusLine already configured in settings.json — skipping."
-else
-  tmp=$(mktemp)
-  jq '. + {"statusLine": {"type": "command", "command": "~/.claude/scripts/statusline-command.sh"}}' "$SETTINGS_PATH" > "$tmp"
-  mv "$tmp" "$SETTINGS_PATH"
-  echo "Added statusLine to $SETTINGS_PATH"
-fi
-
-echo ""
-echo "Done! Restart Claude Code to see your new status bar."
-echo ""
-echo "  repo on branch ✓ +0 -0 - model  ●●●●○○○○ 25%  \$0.42  ↑12k ↓3k  - ●●●●●●●○○○○○○○○○ 45%/12% - 14m"
-echo ""
